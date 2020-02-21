@@ -54,6 +54,8 @@ class WikiAPI:
         r = self._get({'action': 'query', 'prop': 'info|flagged', 'titles': title})
         page = list(r['query']['pages'].values())[0]
         lastrevid = page['lastrevid']
+        if 'flagged' is not page:
+            return False
         stable_revid = page['flagged']['stable_revid']
         return lastrevid == stable_revid
 
