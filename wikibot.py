@@ -7,7 +7,9 @@ log = logging.getLogger(__name__)
 
 
 class WikiAPI:
-    headers = {}
+    headers = {
+        'user-agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0',
+    }
     url = 'https://ru.wikipedia.org/w/api.php'
 
     # https://ru.wikipedia.org/w/rest.php
@@ -48,6 +50,13 @@ class WikiAPI:
         r = self._get({'action': 'parse', 'page': title, 'prop': 'wikitext'})
         return r['parse']['wikitext']['*']
 
+    def is_stable(self, title):
+        r = self._get({'action': 'query', 'prop': 'info|flagged', 'titles': title})
+        page = list(r['query']['pages'].values())[0]
+        lastrevid = page['lastrevid']
+        stable_revid = page['flagged']['stable_revid']
+        return lastrevid == stable_revid
+
     def _get(self, params):
         return self._request('GET', params=params)
 
@@ -63,9 +72,14 @@ class WikiAPI:
 
 
 def main():
+    title = 'Jive_Records'
+
     api = WikiAPI()
     api.login()
-    print(api.get_page('Пони'))
+
+    print(api.is_stable(title))
+
+    # print(api.get_page(title))
     api.get_token()
 
 
