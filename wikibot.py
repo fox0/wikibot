@@ -1,4 +1,6 @@
 import logging
+import subprocess
+
 import requests
 
 from private_settings import USERNAME, PASSWORD
@@ -57,6 +59,11 @@ class WikiAPI:
         stable_revid = page['flagged']['stable_revid']
         return lastrevid == stable_revid
 
+    def save_page(self, title, text):
+        token = self.get_token()
+        r = self._post({'action': 'edit', 'title': title, 'text': text, 'token': token})
+        return r
+
     def _get(self, params):
         return self._request('GET', params=params)
 
@@ -71,16 +78,24 @@ class WikiAPI:
         return self.s.request(method, self.url, headers=self.headers, params=params, data=data).json()
 
 
-def main():
-    title = 'Jive_Records'
+def run(api, title):
+    if api.is_stable(title):
+        log.debug('is_stable')
+        return
 
+    text = api.get_page(title)
+    p = subprocess.run(('js', 'wikificator.js'), stdout=subprocess.PIPE, input=text, encoding='utf-8')
+    text2 = p.stdout
+    if text2 == text:
+        log.debug('==')
+        return
+
+    print(api.save_page(title, text2))
+
+
+def main():
     api = WikiAPI()
     api.login()
-
-    print(api.is_stable(title))
-
-    # print(api.get_page(title))
-    api.get_token()
 
 
 if __name__ == '__main__':
