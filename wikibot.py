@@ -54,14 +54,22 @@ class WikiAPI:
         r = self._get({'action': 'query', 'prop': 'info|flagged', 'titles': title})
         page = list(r['query']['pages'].values())[0]
         lastrevid = page['lastrevid']
-        if 'flagged' is not page:
+        try:
+            stable_revid = page['flagged']['stable_revid']
+        except KeyError:
             return False
-        stable_revid = page['flagged']['stable_revid']
         return lastrevid == stable_revid
 
-    def save_page(self, title, text):
+    def save_page(self, title, text, summary):
         token = self.get_token()
-        r = self._post({'action': 'edit', 'title': title, 'text': text, 'token': token})
+        r = self._post({
+            'action': 'edit',
+            'minor': True,
+            'title': title,
+            'text': text,
+            'summary': summary,
+            'token': token,
+        })
         return r['edit']['result'] == 'Success'
 
     def _get(self, params):
@@ -88,9 +96,9 @@ def run(api, title):
     text2 = p.stdout
     if text2 == text:
         log.warning('==')
-        return False
+        return True
 
-    return api.save_page(title, text2)
+    return api.save_page(title, text2, '[[ПРО:CW|Checkwiki]] #64. Исправление внутренних ссылок')
 
 
 def main():
@@ -100,14 +108,17 @@ def main():
     # todo https://tools.wmflabs.org/checkwiki/cgi-bin/checkwiki.cgi?project=ruwiki&view=bots&id=64&offset=0
     with open('64.txt') as f:
         ls = f.readlines()
-        while True:
+        i = 0
+        m = 50
+        while i < m:
             title = random.choice(ls).strip()
-            log.debug(title)
+            log.info(title)
             if run(api, title):
-                requests.get('https://tools.wmflabs.org/checkwiki/cgi-bin/checkwiki.cgi', {
+                requests.get('https://tools.wmflabs.org/checkwiki/cgi-bin/checkwiki.cgi', params={
                     'project': 'ruwiki', 'view': 'only', 'id': 64, 'title': title})
-                break
-            # time.sleep(65)
+                log.debug('%d of %d, Sleep...', i, m)
+                time.sleep(65)
+                i += 1
 
 
 if __name__ == '__main__':
