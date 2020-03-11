@@ -33,10 +33,26 @@ class WikiAPI:
         if r['clientlogin']['status'] != 'PASS':
             raise ValueError(r)
 
+    def patrol(self, rcid):
+        # 'code': 'patroldisabled', 'info': 'Recent changes patrol disabled
+        token = self.get_patrol_token()
+        r = self._post({
+            'action': 'patrol',
+            'token': token,
+            'revid': rcid,
+        })
+        return r
+
     def get_login_token(self):
         """токен одноразовый"""
         r = self._get({'action': 'query', 'meta': 'tokens', 'type': 'login'})
         token = r['query']['tokens']['logintoken']
+        # log.debug(token)
+        return token
+
+    def get_patrol_token(self):
+        r = self._get({'action': 'query', 'meta': 'tokens', 'type': 'patrol'})
+        token = r['query']['tokens']['patroltoken']
         # log.debug(token)
         return token
 
@@ -53,7 +69,10 @@ class WikiAPI:
     def is_stable(self, title):
         r = self._get({'action': 'query', 'prop': 'info|flagged', 'titles': title})
         page = list(r['query']['pages'].values())[0]
-        lastrevid = page['lastrevid']
+        try:
+            lastrevid = page['lastrevid']
+        except KeyError:  # deleted
+            return True
         try:
             stable_revid = page['flagged']['stable_revid']
         except KeyError:
@@ -70,7 +89,7 @@ class WikiAPI:
             'summary': summary,
             'token': token,
         })
-        return r['edit']['result'] == 'Success'
+        return r
 
     def _get(self, params):
         return self._request('GET', params=params)
@@ -87,18 +106,26 @@ class WikiAPI:
 
 
 def run(api, title):
-    if api.is_stable(title):
-        log.warning('is_stable')
-        return False
+    # if api.is_stable(title):
+    #     log.warning('is_stable')
+    #     return False
 
-    text = api.get_page(title)
+    try:
+        text = api.get_page(title)
+    except KeyError:
+        return False
     p = subprocess.run(('js', 'wikificator.js'), stdout=subprocess.PIPE, input=text, encoding='utf-8')
     text2 = p.stdout
     if text2 == text:
         log.warning('==')
         return True
 
-    return api.save_page(title, text2, '[[ПРО:CW|Checkwiki]] #64. Исправление внутренних ссылок')
+    r = api.save_page(title, text2, '[[ПРО:CW|Checkwiki]] #1. Исправление избыточного префикса "Шаблон:"')
+    # return api.save_page(title, text2, '[[ПРО:CW|Checkwiki]] #64. Исправление внутренних ссылок')
+    try:
+        return r['edit']['result'] == 'Success'
+    except KeyError:
+        return False
 
 
 def main():
@@ -106,18 +133,18 @@ def main():
     api.login(USERNAME, PASSWORD)
 
     # todo https://tools.wmflabs.org/checkwiki/cgi-bin/checkwiki.cgi?project=ruwiki&view=bots&id=64&offset=0
-    with open('64.txt') as f:
+    with open('1.txt') as f:
         ls = f.readlines()
         i = 0
-        m = 50
+        m = 250
         while i < m:
             title = random.choice(ls).strip()
             log.info(title)
             if run(api, title):
                 requests.get('https://tools.wmflabs.org/checkwiki/cgi-bin/checkwiki.cgi', params={
-                    'project': 'ruwiki', 'view': 'only', 'id': 64, 'title': title})
+                    'project': 'ruwiki', 'view': 'only', 'id': 1, 'title': title})
                 log.debug('%d of %d, Sleep...', i, m)
-                time.sleep(65)
+                time.sleep(10)
                 i += 1
 
 
